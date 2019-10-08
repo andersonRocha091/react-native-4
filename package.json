@@ -14,21 +14,19 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "codenation-jest-score": "https://github.com/thecodenation/codenation-jest-score/tarball/master",
     "expo": "^33.0.0",
-    "expo-camera": "^5.0.1",
-    "expo-permissions": "~5.0.1",
+    "expo-camera": "~5.0.1",
     "moment": "^2.24.0",
-    "react": "16.8.3",
-    "react-dom": "^16.8.6",
+    "react": "16.8.6",
+    "react-dom": "16.8.6",
     "react-native": "https://github.com/expo/react-native/archive/sdk-33.0.0.tar.gz",
-    "react-native-web": "^0.11.4"
+    "react-native-web": "^0.11.4",
+    "react-navigation": "^3.12.0"
   },
   "devDependencies": {
     "babel-preset-expo": "^5.1.1",
-    "jest": "^24.9.0",
     "jest-expo": "^33.0.2",
-    "react-test-renderer": "^16.8.6"
+    "react-test-renderer": "16.8.6"
   },
   "private": true
 }

@@ -1,22 +1,19 @@
 import React from 'react';
 import moment from 'moment';
-import { AsyncStorage } from 'react-native';
 import {
-  StyleSheet,
-  Text,
-  View,
-  Image,
-  ScrollView,
   ActivityIndicator,
   Animated,
-  TouchableOpacity,
+  AsyncStorage,
+  Image,
+  ScrollView,
   StatusBar,
-  Button
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-
-import { Camera } from 'expo-camera';
-import closeButton from '../../assets/close.png';
 import * as Permissions from 'expo-permissions';
+import { Camera } from 'expo-camera';
 
 const profile = {
   "picture": "https://secure.gravatar.com/avatar/f50a9db56e231198af3507f10b5d5491?d=mm",
@@ -42,113 +39,114 @@ export default class Profile extends React.PureComponent {
   fadeAnimation = new Animated.Value(0)
 
   state = {
-    loading: true,
-    hasCameraPermission: null,
-    openCamera: false,
-    type: Camera.Constants.Type.front,
-    photo: profile.picture
+    loading: false,
+    hasCameraPermission: false,
+    isOpenCamera: false,
+    photo: null
   }
-
 
   async componentDidMount() {
     this.finishLoading()
-    const { status } = await Permissions.askAsync(Permissions.CAMERA);
-    this.setState({ hasCameraPermission: status === 'granted' })
-    try {
-      await AsyncStorage.setItem(
-        "userImage",
-        this.state.photo || profile.picture
-      );
-    } catch (error) {
-      alert("houve um problema ao salvar a foto.");
-    }
-    this.retrieveProfilePicture();
-  }
 
-  componentWillMount() {
-    AsyncStorage.getItem("userImage");
+    try {
+      const photo = await AsyncStorage.getItem('userImage');
+
+      this.setState({ photo })
+    } catch(error) {
+      console.error('Could not load the user image', error)
+    }
+
+    try {
+      const { status } = await Permissions.askAsync(Permissions.CAMERA);
+
+      this.setState({ hasCameraPermission: status === 'granted' });
+    } catch (error) {
+      console.error('There was an error trying to get the user permission', error)
+    }
   }
 
   finishLoading = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 600))
       Animated.timing(this.fadeAnimation, {
         toValue: 1,
         duration: 600,
         useNativeDriver: true
       }).start()
-      this.setState({ loading: false });
     } catch (error) {
       console.error(error)
     }
   }
 
+  togglleCamera = async () => {
+    if (this.state.hasCameraPermission) {
+      try {
+        const { status } = await Permissions.askAsync(Permissions.CAMERA);
+
+        if (status !== 'granted') {
+          return
+        }
+
+        this.setState({ hasCameraPermission: true });
+      } catch (error) {
+        console.error('There was an error trying to get the user permission', error)
+        return
+      }
+    }
+
+    Animated.timing(this.fadeAnimation, {
+      toValue: this.state.isOpenCamera ? 1 : 0,
+      duration: 600,
+      useNativeDriver: true
+    }).start()
+
+    this.setState({
+      isOpenCamera: !this.state.isOpenCamera
+    })
+  }
+
   takePicture = async () => {
     if (window.camera) {
-      let photoData = await window.camera.takePictureAsync({ base64: true });
-        try {
-        AsyncStorage.setItem('userImage', `data:image/jpg;base64,${photoData.base64}`).then(()=>{
-          this.setState({
-            openCamera: false,
-            photo: `data:image/jpg;base64,${photoData.base64}`
-          })
-          this.finishLoading()
-        })
-        } catch (error) {
-          console.log(error);
-        }
+      const photo = await window.camera.takePictureAsync({ base64: true });
+
+      try {
+        await AsyncStorage.setItem('userImage', photo ? `data:image/jpg;base64,${photo.base64}` : '');
+      } catch (error) {
+        console.error('Error saving the image', error)
+      }
+
+      this.setState({ photo: photo ? `data:image/jpg;base64,${photo.base64}` : '' });
+      this.togglleCamera();
     }
   }
 
-  showCamera = visible => {
-    this.setState({ openCamera: visible });
-  }
-
-  retrieveProfilePicture = async () => {
-    try {
-      let takenPicture = await AsyncStorage.getItem('userImage');
-      this.setState({ photo: takenPicture ? takenPicture : profile.picture });
-    } catch (error) {
-      alert('erro ao recuperar a foto!')
-    }
-  }
-
-  closeCamera = () => {
-    setInterval(() => {
-      this.setState({
-        openCaptures: false
-      });
-      this.finishLoading();
-    }, 600);
-  };
   render() {
 
-    let screen = (
+    if (this.state.isOpenCamera) {
+      return (
+        <Camera className="camera-container" ref={ref => window.camera = ref} style={styles.camera}>
+          <StatusBar className="status-bar" hidden />
+          <View style={styles.cameraContent}>
+            <TouchableOpacity className="camera-close" onPress={this.togglleCamera}>
+              <Text style={styles.cameraClose}>X</Text>
+            </TouchableOpacity>
+            <View style={styles.shotContainer}>
+              <TouchableOpacity className="camera-shot" onPress={this.takePicture}>
+                <Text style={styles.cameraShot}>Tirar foto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Camera>
+      )
+    }
+
+    return (
       <View style={styles.container}>
         <View style={styles.header}>
           <Image
             className="header-image"
             style={styles.headerImage}
-            source={{
-              uri:
-                "https://forum.codenation.com.br/uploads/default/original/2X/2/2d2d2a9469f0171e7df2c4ee97f70c555e431e76.png"
-            }}
+            source={{uri: 'https://forum.codenation.com.br/uploads/default/original/2X/2/2d2d2a9469f0171e7df2c4ee97f70c555e431e76.png'}}
           />
-        </View>
-        <View style={styles.profileTitle}>
-          <TouchableOpacity
-            className="profile-image-btn"
-            onPress={() => this.showCamera(true)}
-          >
-            <Image
-              className="profile-image"
-              style={styles.profileImage}
-              source={{ uri: this.state.photo }}
-            />
-          </TouchableOpacity>
-          <Text className="profile-name" style={styles.profileName}>
-            {profile.name}
-          </Text>
         </View>
         {this.state.loading && (
           <View style={styles.loadingContent}>
@@ -157,140 +155,55 @@ export default class Profile extends React.PureComponent {
         )}
         {!this.state.loading && (
           <ScrollView>
-            <Animated.View
-              className="contact-content"
-              style={[styles.userContent, { opacity: this.fadeAnimation }]}
-            >
-              <Text className="contact-label" style={styles.contentLabel}>
-                Linkedin:
-              </Text>
-              <Text
-                className="contact-value"
-                style={{ ...styles.contentText, ...styles.mBottom }}
-              >
-                {profile.linkedin}
-              </Text>
+            <View style={styles.profileTitle}>
+              <TouchableOpacity className="profile-image-btn" onPress={this.togglleCamera}>
+                <Image
+                  className="profile-image"
+                  style={styles.profileImage}
+                  source={{uri: this.state.photo ? this.state.photo : profile.picture }}
+                />
+              </TouchableOpacity>
+              <Text className="profile-name" style={styles.profileName}>{profile.name}</Text>
+            </View>
+            <Animated.View className="contact-content" style={[styles.userContent, { opacity: this.fadeAnimation }]}>
+                <Text className="contact-label" style={styles.contentLabel}>Linkedin:</Text>
+                <Text className="contact-value" style={{...styles.contentText, ...styles.mBottom}}>{profile.linkedin}</Text>
 
-              <Text className="contact-label" style={styles.contentLabel}>
-                Github:
-              </Text>
-              <Text className="contact-value" style={styles.contentText}>
-                {profile.github}
-              </Text>
+                <Text className="contact-label" style={styles.contentLabel}>Github:</Text>
+                <Text className="contact-value" style={styles.contentText}>{profile.github}</Text>
             </Animated.View>
-            <Animated.View
-              className="contact-content"
-              style={[styles.userContent, { opacity: this.fadeAnimation }]}
-            >
-              <Text className="contact-label" style={styles.contentLabel}>
-                E-mail:
-              </Text>
-              <Text
-                className="contact-value"
-                style={{ ...styles.contentText, ...styles.mBottom }}
-              >
-                {profile.email}
-              </Text>
+            <Animated.View className="contact-content" style={[styles.userContent, { opacity: this.fadeAnimation }]}>
+                <Text className="contact-label" style={styles.contentLabel}>E-mail:</Text>
+                <Text className="contact-value" style={{...styles.contentText, ...styles.mBottom}}>{profile.email}</Text>
 
-              <Text className="contact-label" style={styles.contentLabel}>
-                Celular:
-              </Text>
-              <Text
-                className="contact-value"
-                style={{ ...styles.contentText, ...styles.mBottom }}
-              >
-                {profile.phone}
-              </Text>
+                <Text className="contact-label" style={styles.contentLabel}>Celular:</Text>
+                <Text className="contact-value" style={{...styles.contentText, ...styles.mBottom}}>{profile.phone}</Text>
 
-              <Text className="contact-label" style={styles.contentLabel}>
-                Data de Nascimento:
-              </Text>
-              <Text
-                className="contact-value"
-                style={{ ...styles.contentText, ...styles.mBottom }}
-              >
-                {moment(profile.birthday).format("DD/MM/YYYY")}
-              </Text>
+                <Text className="contact-label" style={styles.contentLabel}>Data de Nascimento:</Text>
+                <Text className="contact-value" style={{...styles.contentText, ...styles.mBottom}}>
+                  {moment(profile.birthday).format('DD/MM/YYYY')}
+                </Text>
 
-              <Text className="contact-label" style={styles.contentLabel}>
-                Sexo:
-              </Text>
-              <Text
-                className="contact-value"
-                style={{ ...styles.contentText, ...styles.mBottom }}
-              >
-                {profile.gender === 1 ? "Masculino" : "Feminino"}
-              </Text>
+                <Text className="contact-label" style={styles.contentLabel}>Sexo:</Text>
+                <Text className="contact-value" style={{...styles.contentText, ...styles.mBottom}}>
+                  {profile.gender === 1 ? 'Masculino' : 'Feminino'}
+                </Text>
 
-              <Text className="contact-label" style={styles.contentLabel}>
-                Idiomas:
-              </Text>
-              <View style={styles.languageContent}>
-                {profile.language.map(language => (
-                  <View key={language} style={styles.language}>
-                    <Text
-                      className="contact-language"
-                      style={styles.languageText}
-                    >
-                      {language}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+                <Text className="contact-label" style={styles.contentLabel}>Idiomas:</Text>
+                <View style={styles.languageContent}>
+                  {profile.language.map(language => (
+                    <View key={language} style={styles.language}>
+                      <Text className="contact-language" style={styles.languageText}>
+                        {language}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
             </Animated.View>
           </ScrollView>
         )}
       </View>
     );
-
-    if (this.state.openCamera) {
-     screen = (
-        <View style={{ flex: 1 }}>
-          <StatusBar className="status-bar" hidden={true} />
-          <Camera
-            className="camera-container"
-            style={{ flex: 1 }}
-            type={this.state.type}
-            ref={(ref) => {
-              window.camera = ref;
-              window.camera = ref;
-            }}
-          >
-            <TouchableOpacity
-              className="camera-close"
-              style={styles.cameraClose}
-              onPress={() => {
-                // this.setState({
-                //   openCamera: false
-                // });
-                // this.finishLoading();
-                this.closeCamera();
-              }}
-            >
-              <Image source={require('../../assets/close.png')} />
-            </TouchableOpacity>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: 'transparent',
-                flexDirection: 'row'
-              }}
-            >
-              <TouchableOpacity
-                className="camera-shot"
-                onPress={() => {
-                  this.takePicture()
-                }}>
-                <Text style={{ fontSize: 18, marginBottom: 10, color: 'white' }}>Tirar Foto</Text>
-              </TouchableOpacity>
-            </View>
-          </Camera>
-
-        </View>
-      )
-    }
-
-    return screen;
   }
 }
 
@@ -370,14 +283,27 @@ const styles = StyleSheet.create({
     padding: 5,
     paddingHorizontal: 10
   },
+  camera: {
+    flex: 1
+  },
+  cameraContent: {
+    flex: 1,
+    justifyContent: 'space-between'
+  },
   cameraClose: {
-    marginTop: 20,
-    marginLeft: 20
+    color: '#FFF',
+    fontSize: 24,
+    marginTop: 10,
+    marginLeft: 16
   },
   cameraShot: {
+    color: '#FFF',
+    fontSize: 24,
+  },
+  shotContainer: {
     flex: 1,
+    alignContent: 'flex-end',
     alignItems: 'center',
-    alignSelf: 'flex-end',
-    justifyContent: 'center'
+    justifyContent: 'flex-end'
   }
 });

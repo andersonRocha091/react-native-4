@@ -1,8 +1,14 @@
 import React from 'react';
+import { createStackNavigator, createAppContainer } from "react-navigation";
+
 import Profile from './src/screens/Profile';
 
-const App = () => (
-  <Profile />
-)
+const AppNavigator = createStackNavigator({
+  Profile: {
+    screen: Profile
+  }
+}, {
+  headerMode: 'none'
+});
 
-export default App;
+export default createAppContainer(AppNavigator);
